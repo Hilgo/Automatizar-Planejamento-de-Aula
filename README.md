@@ -63,7 +63,7 @@ Exemplo dos principais campos:
 ```json
 {
   "bimestre": "2º",
-  "descricao_padrao": "As aulas serão ministradas de maneira expositiva e prática.",
+  "descricao_template": "As aulas serão ministradas de maneira expositiva visando a apresentação dos conceitos para os alunos avançarem no conteúdo do material digital (Educação Profissional) e desenvolverem as habilidades correspondentes. {descricoes_dia} {descricao_pratica}",
   "grade_horaria": "dados/grade_horaria.xlsx",
   "turmas_sufixo": {
     "2DS": "2DS F",
@@ -93,6 +93,27 @@ Cada disciplina deve informar:
 - `ultimo_inicio_planejamento`: data de início do último planejamento, no formato `dd/mm/aaaa`.
 
 Com esses dados, o script calcula a próxima semana de planejamento automaticamente.
+
+### Template da descrição da aula
+
+O campo `descricao_template` permite personalizar o texto da coluna `DescriçãoAula`.
+
+O código substitui automaticamente estes valores:
+
+- `{descricoes_dia}`: frases com os objetivos de aprendizagem agrupados por dia;
+- `{descricao_pratica}`: frase sobre os dias com aula prática;
+- `{dias_com_aula}`: lista dos dias do planejamento que possuem aula;
+- `{dias_praticos}`: lista dos dias que possuem aula prática.
+
+Exemplo:
+
+```json
+{
+  "descricao_template": "As aulas serão desenvolvidas com exposição dialogada e atividades orientadas. {descricoes_dia} {descricao_pratica}"
+}
+```
+
+Se o template não tiver um dos campos acima, ele simplesmente não será usado no texto final. O arquivo ainda aceita `descricao_padrao` por compatibilidade com versões antigas, mas o recomendado é usar `descricao_template`.
 
 ## Arquivos necessários
 
@@ -182,6 +203,10 @@ Esse script verifica:
 - objetivos de aprendizagem esperados;
 - quantidade de aulas por disciplina;
 - colunas obrigatórias no arquivo final.
+
+Quando a validação passa, o script também imprime no terminal uma sugestão de `config.json` para a próxima geração. Essa sugestão não sobrescreve o arquivo atual; ela apenas mostra quais valores copiar caso o professor queira avançar para a próxima semana de planejamento.
+
+Exemplo: depois de validar um planejamento de `25/05/2026` a `29/05/2026`, o debug pode sugerir um config que gera o próximo período, de `01/06/2026` a `05/06/2026`, já atualizando `ultima_semana`, `ultima_aula` e `ultimo_inicio_planejamento` de cada disciplina.
 
 ## Dependências
 

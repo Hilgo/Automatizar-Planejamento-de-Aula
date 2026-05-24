@@ -1,6 +1,7 @@
 import json
 import re
 import sys
+from copy import deepcopy
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -325,9 +326,94 @@ def montar_esperado(config):
                         colunas["objetivo"]
                     ]
 
+                ultima = proximas.iloc[-1]
+                registro["_disciplina_config"] = componente
+                registro["_proxima_ultima_semana"] = int(
+                    ultima["semana_normalizada"]
+                )
+                registro["_proxima_ultima_aula"] = int(
+                    ultima["numero_aula"]
+                )
+
                 esperados.append(registro)
 
     return esperados, erros
+
+
+def montar_config_sugerido(config, esperados):
+    config_sugerido = deepcopy(config)
+
+    for esperado in esperados:
+        disciplina = esperado["_disciplina_config"]
+
+        if disciplina not in config_sugerido["disciplinas"]:
+            continue
+
+        config_sugerido["disciplinas"][disciplina][
+            "ultima_semana"
+        ] = esperado["_proxima_ultima_semana"]
+
+        config_sugerido["disciplinas"][disciplina][
+            "ultima_aula"
+        ] = esperado["_proxima_ultima_aula"]
+
+        config_sugerido["disciplinas"][disciplina][
+            "ultimo_inicio_planejamento"
+        ] = esperado["InicioPlanejamento"]
+
+    return config_sugerido
+
+
+def obter_periodo_proxima_geracao(config_sugerido):
+    periodos = set()
+
+    for dados in config_sugerido["disciplinas"].values():
+        inicio, fim = calcular_inicio_fim(
+            dados["ultimo_inicio_planejamento"]
+        )
+        periodos.add((inicio, fim))
+
+    return sorted(periodos)
+
+
+def imprimir_config_sugerido(config, esperados):
+    if not esperados:
+        return
+
+    config_sugerido = montar_config_sugerido(
+        config,
+        esperados,
+    )
+
+    periodos = obter_periodo_proxima_geracao(
+        config_sugerido
+    )
+
+    print("\n" + "=" * 70)
+    print("SUGESTÃO DE CONFIG PARA A PRÓXIMA GERAÇÃO")
+    print("=" * 70)
+
+    if periodos:
+        for inicio, fim in periodos:
+            print(
+                f"Próximo planejamento estimado: {inicio} a {fim}"
+            )
+
+    print(
+        "\nObservação: o campo ultimo_inicio_planejamento continua "
+        "representando o início do planejamento já gerado. "
+        "O gerar_planejamento.py calcula a próxima segunda-feira "
+        "a partir dele."
+    )
+
+    print("\nJSON sugerido para copiar para o config.json:\n")
+    print(
+        json.dumps(
+            config_sugerido,
+            ensure_ascii=False,
+            indent=4,
+        )
+    )
 
 
 def comparar_valor(rotulo, esperado, gerado):
@@ -437,6 +523,10 @@ def main():
 
     if sucesso:
         print("[OK] Geração coerente com config, grade e escopo")
+        imprimir_config_sugerido(
+            config,
+            esperados,
+        )
     else:
         print("[ERRO] Foram encontradas divergências na geração")
 

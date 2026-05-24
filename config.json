@@ -1,6 +1,6 @@
 {
     "bimestre": "2º",
-    "descricao_padrao": "As aulas serão ministradas de maneira expositiva e prática.",
+    "descricao_template": "As aulas serão ministradas de maneira expositiva visando a apresentação dos conceitos para os alunos avançarem no conteúdo do material digital (Educação Profissional) e desenvolverem as habilidades correspondentes. {descricoes_dia} {descricao_pratica}",
     "data_elaboracao_auto": true,
     "grade_horaria": "dados/grade_horaria.xlsx",
     "turmas_sufixo": {

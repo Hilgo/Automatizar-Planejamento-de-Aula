@@ -25,9 +25,20 @@ with open(
 
 BIMESTRE = config["bimestre"]
 
-DESCRICAO = config[
-    "descricao_padrao"
-]
+DESCRICAO_TEMPLATE_PADRAO = (
+    "As aulas serão ministradas de maneira expositiva visando a apresentação "
+    "dos conceitos para os alunos avançarem no conteúdo do material digital "
+    "(Educação Profissional) e desenvolverem as habilidades correspondentes. "
+    "{descricoes_dia} {descricao_pratica}"
+)
+
+DESCRICAO_TEMPLATE = config.get(
+    "descricao_template",
+    config.get(
+        "descricao_padrao",
+        DESCRICAO_TEMPLATE_PADRAO
+    )
+)
 
 GRADE = config[
     "grade_horaria"
@@ -107,7 +118,12 @@ def formatar_objetivo_para_descricao(objetivo):
 def gerar_descricao_aula(aulas_por_dia):
 
     if not aulas_por_dia:
-        return DESCRICAO
+        return DESCRICAO_TEMPLATE.format(
+            descricoes_dia="",
+            descricao_pratica="",
+            dias_com_aula="",
+            dias_praticos="",
+        ).strip()
 
     descricoes_dia = []
     dias_praticos = []
@@ -139,8 +155,13 @@ def gerar_descricao_aula(aulas_por_dia):
             f"{artigo} do dia {dia} {verbo} sobre {juntar_textos(objetivos)}"
         )
 
-    descricao = "As aulas serão ministradas de maneira expositiva visando a apresentação dos conceitos para os alunos avançarem no conteúdo do material digital (Educação Profissional) e desenvolverem as habilidades correspondentes. "
-    descricao += ". ".join(descricoes_dia)
+    descricoes_dia_texto = ". ".join(descricoes_dia)
+
+    if descricoes_dia_texto:
+        descricoes_dia_texto += "."
+
+    dias_praticos_texto = ""
+    descricao_pratica = ""
 
     if dias_praticos:
         dias = [
@@ -148,13 +169,27 @@ def gerar_descricao_aula(aulas_por_dia):
             for data in dias_praticos
         ]
 
-        descricao += (
-            f". As aulas do dia {juntar_textos(dias)} terão caráter prático, "
+        dias_praticos_texto = juntar_textos(dias)
+
+        descricao_pratica = (
+            f"As aulas do dia {dias_praticos_texto} terão caráter prático, "
             "visando contextualizar o que foi ministrado nas aulas anteriores, "
             "fazendo com que os alunos vivenciem o que foi estudado."
         )
 
-    return descricao
+    dias_com_aula = [
+        data.split("/")[0]
+        for data in sorted(aulas_por_dia.keys())
+    ]
+
+    descricao = DESCRICAO_TEMPLATE.format(
+        descricoes_dia=descricoes_dia_texto,
+        descricao_pratica=descricao_pratica,
+        dias_com_aula=juntar_textos(dias_com_aula),
+        dias_praticos=dias_praticos_texto,
+    )
+
+    return " ".join(descricao.split())
 
 # =====================================
 # CALCULAR DATA
@@ -664,7 +699,7 @@ for item in ARQUIVOS:
                     datetime.now().strftime("%d/%m/%Y"),
 
                 "DescriçãoAula":
-                    DESCRICAO,
+                    "",
 
                 "QtdeAulas":
                     len(proximas),
