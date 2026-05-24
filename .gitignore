@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Planilhas locais
+*.xlsx
+*.xls
+*.xlsm
+
+# Saídas temporárias
+*.tmp
+*.log
+
+# Sistema/editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,49 @@
+{
+    "bimestre": "2º",
+    "descricao_padrao": "As aulas serão ministradas de maneira expositiva e prática.",
+    "data_elaboracao_auto": true,
+    "grade_horaria": "dados/grade_horaria.xlsx",
+    "turmas_sufixo": {
+        "2DS": "2DS F",
+        "3DS": "3DS Y"
+    },
+    "arquivos_escopo": [
+        {
+            "arquivo": "dados/Escopo-sequência 2DS.xlsx",
+            "turma": "2DS",
+            "abas": [
+                "SIS"
+            ]
+        },
+        {
+            "arquivo": "dados/Escopo-sequência 3DS.xlsx",
+            "turma": "3DS",
+            "abas": [
+                "SIS",
+                "PMD"
+            ]
+        }
+    ],
+    "disciplinas": {
+        "Lógica e Linguagem de Programação": {
+            "ultima_semana": 10,
+            "ultima_aula": 4,
+            "ultimo_inicio_planejamento": "18/05/2026"
+        },
+        "Redes de Computadores e Segurança da Informação na Nuvem": {
+            "ultima_semana": 10,
+            "ultima_aula": 2,
+            "ultimo_inicio_planejamento": "18/05/2026"
+        },
+        "Programação Mobile": {
+            "ultima_semana": 10,
+            "ultima_aula": 2,
+            "ultimo_inicio_planejamento": "18/05/2026"
+        },
+        "Projeto Multidisciplinar": {
+            "ultima_semana": 11,
+            "ultima_aula": 2,
+            "ultimo_inicio_planejamento": "18/05/2026"
+        }
+    }
+}
