@@ -64,6 +64,8 @@ Exemplo dos principais campos:
 {
   "bimestre": "2º",
   "descricao_template": "As aulas serão ministradas de maneira expositiva visando a apresentação dos conceitos para os alunos avançarem no conteúdo do material digital (Educação Profissional) e desenvolverem as habilidades correspondentes. {descricoes_dia} {descricao_pratica}",
+  "dias_nao_letivos": ["Qui", "Sex"],
+  "datas_nao_letivas": [],
   "grade_horaria": "dados/grade_horaria.xlsx",
   "turmas_sufixo": {
     "2DS": "2DS F",
@@ -93,6 +95,38 @@ Cada disciplina deve informar:
 - `ultimo_inicio_planejamento`: data de início do último planejamento, no formato `dd/mm/aaaa`.
 
 Com esses dados, o script calcula a próxima semana de planejamento automaticamente.
+
+### Dias não letivos
+
+Use `dias_nao_letivos` para informar dias da semana sem aula no planejamento que será gerado.
+
+Exemplo:
+
+```json
+{
+  "dias_nao_letivos": ["Qui", "Sex"]
+}
+```
+
+Nesse caso, todas as aulas de quinta e sexta da semana planejada serão tratadas como não letivas.
+
+Também é possível informar datas específicas em `datas_nao_letivas`:
+
+```json
+{
+  "datas_nao_letivas": ["04/06/2026", "05/06/2026"]
+}
+```
+
+As datas podem ser informadas como `dd/mm/aaaa` ou `dd/mm`.
+
+Quando um dia é não letivo:
+
+- o campo `NumAulaES` mostra `Dia não letivo`;
+- `QtdeAulas` conta apenas as aulas realmente letivas;
+- os campos `Conteudo`, `ObjetivosAprendizagem` e `Habilidades` não recebem informação dessa aula;
+- a `DescriçãoAula` não menciona o dia sem aula;
+- a aula não letiva não avança a sequência do escopo.
 
 ### Template da descrição da aula
 
@@ -198,10 +232,11 @@ Esse script verifica:
 
 - data correta de início e fim do planejamento;
 - dias corretos das aulas conforme a grade;
+- dias não letivos configurados em `dias_nao_letivos` e `datas_nao_letivas`;
 - `NumAulaES1` e `NumAulaES2`;
 - conteúdos esperados;
 - objetivos de aprendizagem esperados;
-- quantidade de aulas por disciplina;
+- quantidade de aulas letivas por disciplina;
 - colunas obrigatórias no arquivo final.
 
 Quando a validação passa, o script também imprime no terminal uma sugestão de `config.json` para a próxima geração. Essa sugestão não sobrescreve o arquivo atual; ela apenas mostra quais valores copiar caso o professor queira avançar para a próxima semana de planejamento.
