@@ -52,6 +52,16 @@ ARQUIVOS = config[
     "arquivos_escopo"
 ]
 
+DIAS_NAO_LETIVOS = config.get(
+    "dias_nao_letivos",
+    []
+)
+
+DATAS_NAO_LETIVAS = config.get(
+    "datas_nao_letivas",
+    []
+)
+
 # =====================================
 # MAPA TURMAS (do config)
 # =====================================
@@ -75,6 +85,11 @@ DIAS = {
     "Qua": 2,
     "Qui": 3,
     "Sex": 4
+}
+
+DIAS_NORMALIZADOS = {
+    dia.lower(): dia
+    for dia in DIAS
 }
 
 # =====================================
@@ -115,6 +130,57 @@ def formatar_objetivo_para_descricao(objetivo):
     return objetivo[0].lower() + objetivo[1:]
 
 
+def normalizar_data_nao_letiva(valor):
+
+    texto = str(valor).strip()
+
+    for formato in ("%d/%m/%Y", "%d/%m"):
+        try:
+            return datetime.strptime(texto, formato).strftime(formato)
+        except ValueError:
+            continue
+
+    return texto
+
+
+def eh_dia_nao_letivo(dia_semana, data):
+
+    dia = str(dia_semana).strip()
+    dia_normalizado = DIAS_NORMALIZADOS.get(
+        dia.lower(),
+        dia
+    )
+
+    dias_config = {
+        DIAS_NORMALIZADOS.get(
+            str(item).strip().lower(),
+            str(item).strip()
+        )
+        for item in DIAS_NAO_LETIVOS
+    }
+
+    datas_config = {
+        normalizar_data_nao_letiva(item)
+        for item in DATAS_NAO_LETIVAS
+    }
+
+    data_completa = datetime.strptime(
+        data,
+        "%d/%m/%Y"
+    ).strftime("%d/%m/%Y")
+
+    data_curta = datetime.strptime(
+        data,
+        "%d/%m/%Y"
+    ).strftime("%d/%m")
+
+    return (
+        dia_normalizado in dias_config
+        or data_completa in datas_config
+        or data_curta in datas_config
+    )
+
+
 def gerar_descricao_aula(aulas_por_dia):
 
     if not aulas_por_dia:
@@ -127,6 +193,7 @@ def gerar_descricao_aula(aulas_por_dia):
 
     descricoes_dia = []
     dias_praticos = []
+    qtd_aulas_praticas = 0
 
     for data in sorted(aulas_por_dia.keys()):
         aulas = aulas_por_dia[data]
@@ -142,6 +209,7 @@ def gerar_descricao_aula(aulas_por_dia):
 
             if aula["tipo"] == "Prática":
                 tem_pratica = True
+                qtd_aulas_praticas += 1
 
         if tem_pratica:
             dias_praticos.append(data)
@@ -171,8 +239,12 @@ def gerar_descricao_aula(aulas_por_dia):
 
         dias_praticos_texto = juntar_textos(dias)
 
+        artigo_pratica = "A aula" if qtd_aulas_praticas == 1 else "As aulas"
+        verbo_pratica = "terá" if qtd_aulas_praticas == 1 else "terão"
+        texto_dia = "do dia" if len(dias) == 1 else "dos dias"
+
         descricao_pratica = (
-            f"As aulas do dia {dias_praticos_texto} terão caráter prático, "
+            f"{artigo_pratica} {texto_dia} {dias_praticos_texto} {verbo_pratica} caráter prático, "
             "visando contextualizar o que foi ministrado nas aulas anteriores, "
             "fazendo com que os alunos vivenciem o que foi estudado."
         )
@@ -630,9 +702,28 @@ for item in ARQUIVOS:
                 aulas_grade
             )
 
+            qtd_aulas_letivas = 0
+
+            for _, aula_grade in aulas_grade.iterrows():
+                data_grade = calcular_data(
+                    INICIO,
+                    aula_grade["Dia"]
+                )
+
+                if not eh_dia_nao_letivo(
+                    aula_grade["Dia"],
+                    data_grade
+                ):
+                    qtd_aulas_letivas += 1
+
             print(
                 f"Qtd aulas: "
                 f"{qtd_aulas}"
+            )
+
+            print(
+                f"Qtd aulas letivas: "
+                f"{qtd_aulas_letivas}"
             )
 
             # =============================
@@ -643,7 +734,7 @@ for item in ARQUIVOS:
 
                 aulas_disciplina.iloc[
                     indice_atual + 1:
-                    indice_atual + 1 + qtd_aulas
+                    indice_atual + 1 + qtd_aulas_letivas
                 ]
             )
 
@@ -651,7 +742,7 @@ for item in ARQUIVOS:
             # SEM PRÓXIMAS AULAS
             # =============================
 
-            if proximas.empty:
+            if qtd_aulas_letivas > 0 and proximas.empty:
 
                 print(
                     "Erro: Nao encontrou "
@@ -702,12 +793,16 @@ for item in ARQUIVOS:
                     "",
 
                 "QtdeAulas":
-                    len(proximas),
+                    qtd_aulas_letivas,
             }
 
             habilidades = []
 
             aulas_por_dia = {}
+
+            num_aula_por_dia = {}
+
+            indice_proxima = 0
 
             # =============================
             # PROCESSAR AULAS
@@ -715,15 +810,14 @@ for item in ARQUIVOS:
 
             for i, (
                 idx,
-                aula
+                aula_grade
             ) in enumerate(
-                proximas.iterrows()
+                aulas_grade.iterrows()
             ):
 
                 dia_semana = (
 
-                    aulas_grade
-                    .iloc[i]["Dia"]
+                    aula_grade["Dia"]
                 )
 
                 data = calcular_data(
@@ -737,6 +831,42 @@ for item in ARQUIVOS:
                     "%d/%m/%Y"
 
                 ).strftime("%d/%m")
+
+                if (
+                    data_curta
+                    not in num_aula_por_dia
+                ):
+
+                    num_aula_por_dia[
+                        data_curta
+                    ] = []
+
+                if eh_dia_nao_letivo(
+                    dia_semana,
+                    data
+                ):
+
+                    num_aula_por_dia[
+                        data_curta
+                    ].append(
+                        "Dia não letivo"
+                    )
+
+                    continue
+
+                if indice_proxima >= len(proximas):
+
+                    print(
+                        "Aviso: Nao ha aula "
+                        "do escopo suficiente "
+                        "para a grade letiva"
+                    )
+
+                    continue
+
+                aula = proximas.iloc[
+                    indice_proxima
+                ]
 
                 semana = aula[
                     "semana_normalizada"
@@ -764,6 +894,12 @@ for item in ARQUIVOS:
                     f"S{semana} "
                     f"Aula {numero} "
                     f"{tipo}"
+                )
+
+                num_aula_por_dia[
+                    data_curta
+                ].append(
+                    texto
                 )
 
                 if (
@@ -819,19 +955,21 @@ for item in ARQUIVOS:
                     )
                 )
 
+                indice_proxima += 1
+
             # =============================
             # NumAulaES
             # =============================
 
             linhas_num_aula = []
 
-            for data in sorted(aulas_por_dia.keys()):
-                aulas = aulas_por_dia[data]
+            for data in sorted(num_aula_por_dia.keys()):
+                aulas = num_aula_por_dia[data]
 
                 linhas_num_aula.append(
                     f"{data} - "
                     + ", ".join(
-                        aula["texto"]
+                        aula
                         for aula in aulas
                     )
                 )
@@ -876,7 +1014,17 @@ for item in ARQUIVOS:
             # ATUALIZAR CONFIG
             # =============================
 
-            ultima = proximas.iloc[-1]
+            if indice_proxima == 0:
+
+                print(
+                    "Aviso: Nenhuma aula letiva "
+                    "foi planejada para atualizar "
+                    "o config"
+                )
+
+                continue
+
+            ultima = proximas.iloc[indice_proxima - 1]
 
             DISCIPLINAS[
                 componente

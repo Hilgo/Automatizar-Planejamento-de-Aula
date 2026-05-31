@@ -20,6 +20,11 @@ DIAS = {
     "Sex": 4,
 }
 
+DIAS_NORMALIZADOS = {
+    dia.lower(): dia
+    for dia in DIAS
+}
+
 COLUNAS_OBRIGATORIAS = [
     "InicioPlanejamento",
     "FimPlanejamento",
@@ -94,6 +99,55 @@ def calcular_data(inicio, dia):
     data = data_inicio + timedelta(days=DIAS[dia])
 
     return data.strftime("%d/%m/%Y")
+
+
+def normalizar_data_nao_letiva(valor):
+    texto = str(valor).strip()
+
+    for formato in ("%d/%m/%Y", "%d/%m"):
+        try:
+            return datetime.strptime(texto, formato).strftime(formato)
+        except ValueError:
+            continue
+
+    return texto
+
+
+def eh_dia_nao_letivo(config, dia_semana, data):
+    dia = str(dia_semana).strip()
+    dia_normalizado = DIAS_NORMALIZADOS.get(
+        dia.lower(),
+        dia,
+    )
+
+    dias_config = {
+        DIAS_NORMALIZADOS.get(
+            str(item).strip().lower(),
+            str(item).strip(),
+        )
+        for item in config.get("dias_nao_letivos", [])
+    }
+
+    datas_config = {
+        normalizar_data_nao_letiva(item)
+        for item in config.get("datas_nao_letivas", [])
+    }
+
+    data_completa = datetime.strptime(
+        data,
+        "%d/%m/%Y",
+    ).strftime("%d/%m/%Y")
+
+    data_curta = datetime.strptime(
+        data,
+        "%d/%m/%Y",
+    ).strftime("%d/%m")
+
+    return (
+        dia_normalizado in dias_config
+        or data_completa in datas_config
+        or data_curta in datas_config
+    )
 
 
 def encontrar_colunas(df):
@@ -174,6 +228,75 @@ def montar_linhas_num_aula(proximas, aulas_grade, colunas, inicio):
         )
 
     return linhas
+
+
+def contar_aulas_letivas(config, aulas_grade, inicio):
+    qtd_aulas_letivas = 0
+
+    for _, aula_grade in aulas_grade.iterrows():
+        data = calcular_data(
+            inicio,
+            aula_grade["Dia"],
+        )
+
+        if not eh_dia_nao_letivo(
+            config,
+            aula_grade["Dia"],
+            data,
+        ):
+            qtd_aulas_letivas += 1
+
+    return qtd_aulas_letivas
+
+
+def montar_dados_aulas_planejadas(config, proximas, aulas_grade, colunas, inicio):
+    aulas_por_dia = {}
+    registro = {}
+    indice_proxima = 0
+
+    for i, (_, aula_grade) in enumerate(aulas_grade.iterrows()):
+        dia_semana = aula_grade["Dia"]
+        data = calcular_data(inicio, dia_semana)
+        data_curta = datetime.strptime(data, "%d/%m/%Y").strftime("%d/%m")
+
+        if data_curta not in aulas_por_dia:
+            aulas_por_dia[data_curta] = []
+
+        if eh_dia_nao_letivo(config, dia_semana, data):
+            aulas_por_dia[data_curta].append("Dia não letivo")
+            continue
+
+        if indice_proxima >= len(proximas):
+            continue
+
+        aula = proximas.iloc[indice_proxima]
+        semana = int(aula["semana_normalizada"])
+        numero = int(aula["numero_aula"])
+        tipo = "Prática" if aula[colunas["tipo"]] == "P" else "Teórica"
+        texto = f"S{semana} Aula {numero} {tipo}"
+
+        aulas_por_dia[data_curta].append(texto)
+
+        registro[f"Conteudo{i + 1}"] = (
+            f"S{semana} Aula {numero}: "
+            f"{limpar_titulo(aula[colunas['titulo']])}"
+        )
+
+        registro[f"ObjetivosAprendizagem{i + 1}"] = aula[
+            colunas["objetivo"]
+        ]
+
+        indice_proxima += 1
+
+    linhas = []
+
+    for data in sorted(aulas_por_dia.keys()):
+        linhas.append(
+            f"{data} - "
+            + ", ".join(aulas_por_dia[data])
+        )
+
+    return linhas, registro, indice_proxima
 
 
 def montar_esperado(config):
@@ -282,20 +405,30 @@ def montar_esperado(config):
                 )
 
                 qtd_aulas = len(aulas_grade)
+                qtd_aulas_letivas = contar_aulas_letivas(
+                    config,
+                    aulas_grade,
+                    inicio,
+                )
                 indice_atual = posicao.index[0]
                 proximas = aulas_disciplina.iloc[
                     indice_atual + 1:
-                    indice_atual + 1 + qtd_aulas
+                    indice_atual + 1 + qtd_aulas_letivas
                 ]
 
-                if len(proximas) != qtd_aulas:
+                if len(proximas) != qtd_aulas_letivas:
                     erros.append(
                         f"{componente}: esperado {qtd_aulas} próximas "
                         f"aulas, encontrado {len(proximas)}"
                     )
                     continue
 
-                linhas_num_aula = montar_linhas_num_aula(
+                (
+                    linhas_num_aula,
+                    dados_aulas,
+                    indice_proxima,
+                ) = montar_dados_aulas_planejadas(
+                    config,
                     proximas,
                     aulas_grade,
                     colunas,
@@ -308,12 +441,12 @@ def montar_esperado(config):
                     "FimPlanejamento": fim,
                     "AnoSérie": turmas_sufixo.get(turma, f"{turma} F"),
                     "Bimestre": config["bimestre"],
-                    "QtdeAulas": str(qtd_aulas),
+                    "QtdeAulas": str(qtd_aulas_letivas),
                     "NumAulaES1": linhas_num_aula[0],
                     "NumAulaES2": "\n".join(linhas_num_aula[1:]),
                 }
 
-                for i, (_, aula) in enumerate(proximas.iterrows(), start=1):
+                for i, (_, aula) in enumerate([], start=1):
                     semana = int(aula["semana_normalizada"])
                     numero = int(aula["numero_aula"])
 
@@ -326,7 +459,16 @@ def montar_esperado(config):
                         colunas["objetivo"]
                     ]
 
-                ultima = proximas.iloc[-1]
+                registro.update(dados_aulas)
+
+                if indice_proxima == 0:
+                    erros.append(
+                        f"{componente}: nenhuma aula letiva encontrada "
+                        "para validar"
+                    )
+                    continue
+
+                ultima = proximas.iloc[indice_proxima - 1]
                 registro["_disciplina_config"] = componente
                 registro["_proxima_ultima_semana"] = int(
                     ultima["semana_normalizada"]
