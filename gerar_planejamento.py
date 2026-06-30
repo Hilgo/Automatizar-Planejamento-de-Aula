@@ -130,6 +130,37 @@ def formatar_objetivo_para_descricao(objetivo):
     return objetivo[0].lower() + objetivo[1:]
 
 
+def converter_data_curta(data_curta, inicio):
+
+    data_inicio = datetime.strptime(
+        inicio,
+        "%d/%m/%Y"
+    )
+
+    data = datetime.strptime(
+        f"{data_curta}/{data_inicio.year}",
+        "%d/%m/%Y"
+    )
+
+    if data < data_inicio:
+        data = data.replace(
+            year=data_inicio.year + 1
+        )
+
+    return data
+
+
+def ordenar_datas_curta(datas, inicio):
+
+    return sorted(
+        datas,
+        key=lambda data: converter_data_curta(
+            data,
+            inicio
+        )
+    )
+
+
 def normalizar_data_nao_letiva(valor):
 
     texto = str(valor).strip()
@@ -181,7 +212,7 @@ def eh_dia_nao_letivo(dia_semana, data):
     )
 
 
-def gerar_descricao_aula(aulas_por_dia):
+def gerar_descricao_aula(aulas_por_dia, inicio):
 
     if not aulas_por_dia:
         return DESCRICAO_TEMPLATE.format(
@@ -195,7 +226,10 @@ def gerar_descricao_aula(aulas_por_dia):
     dias_praticos = []
     qtd_aulas_praticas = 0
 
-    for data in sorted(aulas_por_dia.keys()):
+    for data in ordenar_datas_curta(
+        aulas_por_dia.keys(),
+        inicio
+    ):
         aulas = aulas_por_dia[data]
         objetivos = []
         tem_pratica = False
@@ -251,7 +285,10 @@ def gerar_descricao_aula(aulas_por_dia):
 
     dias_com_aula = [
         data.split("/")[0]
-        for data in sorted(aulas_por_dia.keys())
+        for data in ordenar_datas_curta(
+            aulas_por_dia.keys(),
+            inicio
+        )
     ]
 
     descricao = DESCRICAO_TEMPLATE.format(
@@ -963,7 +1000,10 @@ for item in ARQUIVOS:
 
             linhas_num_aula = []
 
-            for data in sorted(num_aula_por_dia.keys()):
+            for data in ordenar_datas_curta(
+                num_aula_por_dia.keys(),
+                INICIO
+            ):
                 aulas = num_aula_por_dia[data]
 
                 linhas_num_aula.append(
@@ -989,7 +1029,8 @@ for item in ARQUIVOS:
             registro[
                 "DescriçãoAula"
             ] = gerar_descricao_aula(
-                aulas_por_dia
+                aulas_por_dia,
+                INICIO
             )
 
             # =============================

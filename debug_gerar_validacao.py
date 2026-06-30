@@ -101,6 +101,35 @@ def calcular_data(inicio, dia):
     return data.strftime("%d/%m/%Y")
 
 
+def converter_data_curta(data_curta, inicio):
+    data_inicio = datetime.strptime(
+        inicio,
+        "%d/%m/%Y",
+    )
+
+    data = datetime.strptime(
+        f"{data_curta}/{data_inicio.year}",
+        "%d/%m/%Y",
+    )
+
+    if data < data_inicio:
+        data = data.replace(
+            year=data_inicio.year + 1,
+        )
+
+    return data
+
+
+def ordenar_datas_curta(datas, inicio):
+    return sorted(
+        datas,
+        key=lambda data: converter_data_curta(
+            data,
+            inicio,
+        ),
+    )
+
+
 def normalizar_data_nao_letiva(valor):
     texto = str(valor).strip()
 
@@ -221,7 +250,10 @@ def montar_linhas_num_aula(proximas, aulas_grade, colunas, inicio):
 
     linhas = []
 
-    for data in sorted(aulas_por_dia.keys()):
+    for data in ordenar_datas_curta(
+        aulas_por_dia.keys(),
+        inicio,
+    ):
         linhas.append(
             f"{data} - "
             + ", ".join(aulas_por_dia[data])
@@ -290,7 +322,10 @@ def montar_dados_aulas_planejadas(config, proximas, aulas_grade, colunas, inicio
 
     linhas = []
 
-    for data in sorted(aulas_por_dia.keys()):
+    for data in ordenar_datas_curta(
+        aulas_por_dia.keys(),
+        inicio,
+    ):
         linhas.append(
             f"{data} - "
             + ", ".join(aulas_por_dia[data])
@@ -587,6 +622,57 @@ def validar_colunas(df_gerado):
     return ok
 
 
+def extrair_datas_num_aula(gerado):
+    datas = []
+
+    for coluna in ("NumAulaES1", "NumAulaES2"):
+        valor = gerado.get(coluna, "")
+
+        if pd.isna(valor):
+            continue
+
+        for linha in str(valor).splitlines():
+            match = re.match(
+                r"^\s*(\d{2}/\d{2})\s+-",
+                linha,
+            )
+
+            if match:
+                datas.append(
+                    match.group(1)
+                )
+
+    return datas
+
+
+def validar_ordem_datas_num_aula(gerado):
+    inicio = gerado.get("InicioPlanejamento", "")
+    datas = extrair_datas_num_aula(
+        gerado
+    )
+
+    if len(datas) < 2:
+        print("  [OK] Ordem das datas em NumAulaES")
+        return True
+
+    datas_ordenadas = ordenar_datas_curta(
+        datas,
+        inicio,
+    )
+
+    if datas == datas_ordenadas:
+        print(
+            "  [OK] Ordem das datas em NumAulaES: "
+            + " -> ".join(datas)
+        )
+        return True
+
+    print("  [ERRO] Datas fora de ordem em NumAulaES")
+    print(f"    gerado:   {' -> '.join(datas)}")
+    print(f"    esperado: {' -> '.join(datas_ordenadas)}")
+    return False
+
+
 def main():
     with open(
         "config.json",
@@ -631,6 +717,11 @@ def main():
             continue
 
         gerado = gerados.iloc[0]
+
+        if not validar_ordem_datas_num_aula(
+            gerado
+        ):
+            sucesso = False
 
         colunas_para_comparar = [
             "InicioPlanejamento",
