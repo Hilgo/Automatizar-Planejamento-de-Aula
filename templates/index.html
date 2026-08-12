@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gerar Planejamento - Web</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; background: #f4f6f8; }
+      .container { max-width: 760px; margin: auto; background: white; padding: 24px; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+      h1 { margin-top: 0; }
+      label { display: block; margin: 16px 0 8px; font-weight: bold; }
+      input[type=file] { width: 100%; }
+      button { margin-top: 18px; padding: 12px 20px; background: #0069d9; color: white; border: none; border-radius: 6px; cursor: pointer; }
+      button:hover { background: #0054b3; }
+      .note { background: #eef5ff; border-left: 4px solid #0069d9; padding: 14px; margin-bottom: 20px; }
+      .flash { background: #fde4e4; border-left: 4px solid #d93025; padding: 14px; margin-bottom: 20px; }
+      .github-fixo { align-items:center; background:#172033; border-radius:999px; box-shadow:0 2px 10px #17203330; color:#fff; display:flex; font-size:14px; gap:7px; padding:10px 14px; position:fixed; right:16px; text-decoration:none; top:16px; z-index:1; } .github-fixo svg { fill:currentColor; height:18px; width:18px; } .github-fixo:hover { background:#1859a9; } @media (max-width:520px) { .github-fixo { font-size:12px; padding:8px 10px; right:10px; top:10px; } .github-fixo svg { height:16px; width:16px; } main { margin:60px 16px; } }
+    </style>
+  </head>
+  <body>
+    <a class="github-fixo" href="https://github.com/Hilgo/Automatizar-Planejamento-de-Aula" target="_blank" rel="noopener noreferrer"><span>Ver no GitHub</span></a>
+    <div class="container">
+      <h1>Gerar Planejamento</h1>
+      {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          {% for message in messages %}
+            <div class="flash">{{ message }}</div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      <div class="note">
+        <p>Este pequeno aplicativo web gera automaticamente a planilha de planejamento de aula a partir do seu arquivo de configuração, grade horária e escopos de disciplina.</p>
+        <p>Envie o arquivo <strong>config.json</strong>, o arquivo da <strong>grade horária</strong> e os arquivos de <strong>escopo</strong>.<br /> O projeto gerará a planilha <strong>base_maladireta.xlsx</strong> automaticamente.</p>
+      </div>
+      {% if user %}
+      <form method="post" enctype="multipart/form-data">
+        <label for="config_file">Arquivo config.json</label>
+        <input id="config_file" name="config_file" type="file" accept=".json" required />
+
+        <label for="grade_file">Arquivo grade horária (.xlsx)</label>
+        <input id="grade_file" name="grade_file" type="file" accept=".xlsx" />
+
+        <label for="escopo_files">Arquivos de escopo / sequência (.xlsx) - use múltiplos arquivos</label>
+        <input id="escopo_files" name="escopo_files" type="file" accept=".xlsx" multiple />
+
+        <button type="submit">Gerar planilha</button>
+      </form>
+      <form action="{{ url_for('logout') }}" method="get" style="margin-top: 16px;">
+        <button type="submit" style="background: #dc3545;">Sair</button>
+      </form>
+      {% else %}
+      <p>Faça login com sua conta Google para acessar o gerador de planejamento.</p>
+      <p><a href="{{ url_for('login') }}"><button>Entrar com Google</button></a></p>
+      {% endif %}
+    </div>
+  </body>
+</html>

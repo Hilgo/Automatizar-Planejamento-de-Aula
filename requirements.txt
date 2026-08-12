@@ -1,3 +1,6 @@
 pandas
 openpyxl
 rapidfuzz
+flask
+gunicorn
+authlib

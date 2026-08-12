@@ -1,10 +1,8 @@
 {
-    "bimestre": "2º",
+    "bimestre": "3º",
     "descricao_template": "As aulas serão ministradas de maneira expositiva visando a apresentação dos conceitos para os alunos avançarem no conteúdo do material digital (Educação Profissional) e desenvolverem as habilidades correspondentes. {descricoes_dia} {descricao_pratica}",
     "data_elaboracao_auto": true,
-    "dias_nao_letivos": [
-
-    ],
+    "dias_nao_letivos": [],
     "datas_nao_letivas": [],
     "grade_horaria": "dados/grade_horaria.xlsx",
     "turmas_sufixo": {
@@ -30,24 +28,24 @@
     ],
     "disciplinas": {
         "Lógica e Linguagem de Programação": {
-            "ultima_semana": 14,
-            "ultima_aula": 3,
-            "ultimo_inicio_planejamento": "22/06/2026"
+            "ultima_semana": 15,
+            "ultima_aula": 4,
+            "ultimo_inicio_planejamento": "03/08/2026"
         },
         "Redes de Computadores e Segurança da Informação na Nuvem": {
-            "ultima_semana": 14,
-            "ultima_aula": 1,
-            "ultimo_inicio_planejamento": "22/06/2026"
+            "ultima_semana": 15,
+            "ultima_aula": 3,
+            "ultimo_inicio_planejamento": "03/08/2026"
         },
         "Programação Mobile": {
-            "ultima_semana": 14,
-            "ultima_aula": 2,
-            "ultimo_inicio_planejamento": "22/06/2026"
+            "ultima_semana": 15,
+            "ultima_aula": 4,
+            "ultimo_inicio_planejamento": "03/08/2026"
         },
         "Projeto Multidisciplinar": {
-            "ultima_semana": 14,
+            "ultima_semana": 15,
             "ultima_aula": 3,
-            "ultimo_inicio_planejamento": "22/06/2026"
+            "ultimo_inicio_planejamento": "03/08/2026"
         }
     }
 }

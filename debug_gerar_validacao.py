@@ -579,7 +579,7 @@ def imprimir_config_sugerido(config, esperados):
     print(
         "\nObservação: o campo ultimo_inicio_planejamento continua "
         "representando o início do planejamento já gerado. "
-        "O gerar_planejamento.py calcula a próxima segunda-feira "
+        "O planejamento_cli.py calcula a próxima segunda-feira "
         "a partir dele."
     )
 
