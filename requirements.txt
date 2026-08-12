@@ -4,3 +4,4 @@ rapidfuzz
 flask
 gunicorn
 authlib
+requests
