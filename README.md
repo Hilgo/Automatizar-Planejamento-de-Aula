@@ -44,6 +44,8 @@ O objetivo é reduzir o trabalho manual de montar o planejamento em Excel e perm
 ├── requirements.txt
 ├── templates/
 │   └── index.html
+├── static/
+│   └── icon.png  # adicione aqui o ícone do site (favicon e cabeçalho)
 ├── dados/
 │   ├── grade_horaria.xlsx
 │   └── Escopo-sequência ... .xlsx
