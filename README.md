@@ -1,5 +1,7 @@
 # Automatizar Planejamento de Aula
 
+Site publicado: https://automatizar-planejamento-de-aula.onrender.com/
+
 Projeto em Python para gerar automaticamente uma planilha de mala direta com planejamentos de aula baseados em:
 
 - arquivo de configuração das turmas e disciplinas (`config.json`);
