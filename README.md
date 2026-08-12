@@ -67,6 +67,7 @@ O objetivo é reduzir o trabalho manual de montar o planejamento em Excel e perm
   - `rapidfuzz`
   - `flask`
   - `authlib`
+   - `requests`
 
 ```bash
 pip install -r requirements.txt
@@ -234,6 +235,12 @@ Abra no navegador:
 http://127.0.0.1:5000/
 ```
 
+Ou acesse a versão publicada em:
+
+```text
+https://automatizar-planejamento-de-aula.onrender.com/
+```
+
 Antes de usar, defina as variáveis de ambiente:
 
 - `SECRET_KEY` — chave secreta do Flask
@@ -252,7 +259,7 @@ Na página web, faça login com o Google e então envie:
 - arquivo da grade horária (`.xlsx`)
 - arquivos de escopo (`.xlsx`)
 
-O sistema retorna a planilha `base_maladireta.xlsx` para download.
+Ao enviar, a interface exibirá uma mensagem de "Processando..." e desabilitará o botão para evitar múltiplos cliques. Quando o processamento terminar, o download do arquivo `base_maladireta.xlsx` será iniciado automaticamente.
 
 ---
 

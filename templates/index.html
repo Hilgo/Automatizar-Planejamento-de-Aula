@@ -33,7 +33,7 @@
         <p>Envie o arquivo <strong>config.json</strong>, o arquivo da <strong>grade horária</strong> e os arquivos de <strong>escopo</strong>.<br /> O projeto gerará a planilha <strong>base_maladireta.xlsx</strong> automaticamente.</p>
       </div>
       {% if user %}
-      <form method="post" enctype="multipart/form-data">
+      <form id="generateForm" method="post" enctype="multipart/form-data">
         <label for="config_file">Arquivo config.json</label>
         <input id="config_file" name="config_file" type="file" accept=".json" required />
 
@@ -43,15 +43,88 @@
         <label for="escopo_files">Arquivos de escopo / sequência (.xlsx) - use múltiplos arquivos</label>
         <input id="escopo_files" name="escopo_files" type="file" accept=".xlsx" multiple />
 
-        <button type="submit">Gerar planilha</button>
+        <button id="generateButton" type="submit">Gerar planilha</button>
       </form>
+      <div style="margin-top:12px;">
+        <span id="statusMessage" style="display:none; margin-right:8px;">Processando... aguarde o download iniciar.</span>
+        <span id="loader" class="loader" style="display:none;"></span>
+      </div>
+
       <form action="{{ url_for('logout') }}" method="get" style="margin-top: 16px;">
-        <button type="submit" style="background: #dc3545;">Sair</button>
+        <button id="logoutButton" type="submit" style="background: #dc3545;">Sair</button>
       </form>
       {% else %}
       <p>Faça login com sua conta Google para acessar o gerador de planejamento.</p>
       <p><a href="{{ url_for('login') }}"><button>Entrar com Google</button></a></p>
       {% endif %}
     </div>
+    <style>
+      .loader { border: 3px solid #f3f3f3; border-top: 3px solid #0069d9; border-radius: 50%; width: 18px; height: 18px; display:inline-block; vertical-align: middle; animation: spin 1s linear infinite; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    <script>
+      (function(){
+        const form = document.getElementById('generateForm');
+        const btn = document.getElementById('generateButton');
+        const status = document.getElementById('statusMessage');
+        const loader = document.getElementById('loader');
+
+        function setProcessing(on){
+          if (!btn) return;
+          btn.disabled = on;
+          btn.textContent = on ? 'Gerando...' : 'Gerar planilha';
+          if (status) status.style.display = on ? 'inline' : 'none';
+          if (loader) loader.style.display = on ? 'inline-block' : 'none';
+        }
+
+        async function handleResponseAsDownload(response){
+          const contentType = response.headers.get('content-type') || '';
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || `Request failed with status ${response.status}`);
+          }
+
+          const blob = await response.blob();
+          // try to extract filename from content-disposition
+          let filename = 'base_maladireta.xlsx';
+          const cd = response.headers.get('content-disposition');
+          if (cd) {
+            const match = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+            if (match) filename = decodeURIComponent(match[1] || match[2]);
+          }
+
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        }
+
+        if (form && btn) {
+          form.addEventListener('submit', async function(e){
+            e.preventDefault();
+            setProcessing(true);
+
+            const formData = new FormData(form);
+            const action = form.getAttribute('action') || window.location.href;
+
+            try {
+              const resp = await fetch(action, { method: 'POST', body: formData });
+              await handleResponseAsDownload(resp);
+            } catch (err) {
+              // show error to user
+              const text = err && err.message ? err.message : 'Erro desconhecido ao gerar o arquivo.';
+              if (status) { status.textContent = text; status.style.display = 'inline'; }
+            } finally {
+              // give user time to see message; reset UI shortly after
+              setTimeout(() => setProcessing(false), 800);
+            }
+          });
+        }
+      })();
+    </script>
   </body>
 </html>
