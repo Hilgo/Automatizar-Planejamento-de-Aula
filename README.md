@@ -66,7 +66,9 @@ O objetivo é reduzir o trabalho manual de montar o planejamento em Excel e perm
   - `openpyxl`
   - `rapidfuzz`
   - `flask`
-- `authlib`
+  - `authlib`
+
+```bash
 pip install -r requirements.txt
 ```
 
