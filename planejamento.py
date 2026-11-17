@@ -26,6 +26,18 @@ DESCRICAO_TEMPLATE_PADRAO = (
     "{descricoes_dia} {descricao_pratica}"
 )
 
+COLUNAS_MALA_DIRETA = [
+    "InicioPlanejamento", "FimPlanejamento", "ComponenteCurricular", "AnoSérie",
+    "Bimestre", "NumAulaES1", "NumAulaES2", "Conteudo1", "Conteudo2",
+    "Conteudo3", "Conteudo4", "Habilidades", "ObjetivosAprendizagem1",
+    "ObjetivosAprendizagem2", "ObjetivosAprendizagem3", "ObjetivosAprendizagem4",
+    "QtdeAulas", "DescriçãoAula", "DataElaboração",
+]
+
+
+class PlanningValidationError(ValueError):
+    """Erro de entrada que impede uma geração confiável da planilha."""
+
 
 def load_config(config_path: str) -> Dict[str, Any]:
     with open(config_path, "r", encoding="utf-8") as arquivo:
@@ -231,42 +243,93 @@ def generate_records(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     turmas_sufixo = config.get("turmas_sufixo", {})
     bimestre = config["bimestre"]
 
-    grade = pd.read_excel(grade_path, dtype=str)
+    try:
+        grade = pd.read_excel(grade_path, dtype=str)
+    except Exception as exc:
+        raise PlanningValidationError(
+            f"Não foi possível ler a grade horária '{grade_path}': {exc}"
+        ) from exc
+
+    grade.columns = [str(col).strip() for col in grade.columns]
+    colunas_grade_ausentes = {"Dia", "Horario", "Turma", "Disciplina"} - set(grade.columns)
+    if colunas_grade_ausentes:
+        raise PlanningValidationError(
+            "A grade horária precisa conter Dia, Horario, Turma e Disciplina. "
+            f"Colunas ausentes: {', '.join(sorted(colunas_grade_ausentes))}."
+        )
+
     registros: List[Dict[str, Any]] = []
+    erros: List[str] = []
+    disciplinas_processadas: set[tuple[str, str]] = set()
 
     for item in arquivos:
         arquivo = item["arquivo"]
         turma = item["turma"]
+        aulas_grade_turma = grade[
+            grade["Turma"].fillna("").astype(str).str.strip() == str(turma).strip()
+        ]
+        disciplinas_grade = {
+            str(valor).strip()
+            for valor in aulas_grade_turma["Disciplina"].dropna()
+            if str(valor).strip()
+        }
+        disciplinas_sem_config = disciplinas_grade - set(disciplinas)
+        if disciplinas_sem_config:
+            erros.append(
+                f"Turma {turma}: disciplina(s) da grade sem configuração em 'disciplinas': "
+                f"{', '.join(sorted(disciplinas_sem_config))}."
+            )
+        disciplinas_com_escopo: set[str] = set()
 
         for aba in item["abas"]:
-            df = pd.read_excel(arquivo, sheet_name=aba, dtype=str)
+            try:
+                df = pd.read_excel(arquivo, sheet_name=aba, dtype=str)
+            except Exception as exc:
+                raise PlanningValidationError(
+                    f"Não foi possível ler a aba '{aba}' do arquivo '{arquivo}': {exc}"
+                ) from exc
             df.columns = [col.strip().lower() for col in df.columns]
 
-            coluna_semana = next(c for c in df.columns if c.strip() == "semana")
-            coluna_tp = next(
-                c
-                for c in df.columns
-                if "teórica/prática" in c
-                or "teorica/pratica" in c
+            def localizar_coluna(rotulo: str, criterio) -> str:
+                coluna = next((c for c in df.columns if criterio(c)), None)
+                if coluna is None:
+                    raise PlanningValidationError(
+                        f"A aba '{aba}' do arquivo '{arquivo}' não contém a coluna necessária: {rotulo}."
+                    )
+                return coluna
+
+            coluna_semana = localizar_coluna("Semana", lambda c: c == "semana")
+            coluna_tp = localizar_coluna(
+                "CH Teórica/Prática", lambda c: "teórica/prática" in c or "teorica/pratica" in c
             )
-            coluna_componente = next(c for c in df.columns if "nome do componente" in c)
-            coluna_titulo = next(
-                c
-                for c in df.columns
-                if "título da aula" in c
-                or "titulo da aula" in c
+            coluna_componente = localizar_coluna(
+                "Nome do componente", lambda c: "nome do componente" in c
             )
-            coluna_habilidade = next(c for c in df.columns if "habilidades" in c)
-            coluna_objetivo = next(c for c in df.columns if "objetivo" in c)
+            coluna_titulo = localizar_coluna(
+                "Título da aula", lambda c: "título da aula" in c or "titulo da aula" in c
+            )
+            coluna_habilidade = localizar_coluna("Habilidades", lambda c: "habilidades" in c)
+            coluna_objetivo = localizar_coluna("Objetivo da aula", lambda c: "objetivo" in c)
+
+            componentes_aba = set(df[coluna_componente].dropna().astype(str).str.strip())
+            disciplinas_com_escopo.update(componentes_aba & disciplinas_grade)
 
             df["semana_normalizada"] = df[coluna_semana].apply(normalizar_semana)
             df["numero_aula"] = df.groupby([coluna_componente, "semana_normalizada"]).cumcount() + 1
 
             for componente in disciplinas.keys():
+                if componente not in disciplinas_grade:
+                    continue
+
                 aulas_disciplina = df[df[coluna_componente].str.lower() == componente.lower()].copy()
 
                 if aulas_disciplina.empty:
                     continue
+
+                chave_disciplina = (str(turma), componente)
+                if chave_disciplina in disciplinas_processadas:
+                    continue
+                disciplinas_processadas.add(chave_disciplina)
 
                 dados = disciplinas[componente]
                 ultima_semana = dados["ultima_semana"]
@@ -292,10 +355,16 @@ def generate_records(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                 ]
 
                 if posicao.empty:
+                    erros.append(
+                        f"Turma {turma}, disciplina {componente}: a posição atual "
+                        f"(semana {ultima_semana}, aula {ultima_aula}) não foi encontrada no escopo da aba '{aba}'."
+                    )
                     continue
 
                 indice_atual = posicao.index[0]
-                aulas_grade = grade[(grade["Turma"] == turma) & (grade["Disciplina"] == componente)]
+                aulas_grade = aulas_grade_turma[
+                    aulas_grade_turma["Disciplina"].fillna("").astype(str).str.strip() == componente
+                ]
 
                 if aulas_grade.empty:
                     continue
@@ -306,8 +375,19 @@ def generate_records(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                     if not eh_dia_nao_letivo(aula_grade["Dia"], data_grade, dias_nao_letivos, datas_nao_letivas):
                         qtd_aulas_letivas += 1
 
+                if qtd_aulas_letivas > 4:
+                    erros.append(
+                        f"Turma {turma}, disciplina {componente}: a semana tem {qtd_aulas_letivas} aulas, "
+                        "mas o modelo de mala direta comporta no máximo 4 conteúdos e objetivos."
+                    )
+                    continue
+
                 proximas = aulas_disciplina.iloc[indice_atual + 1 : indice_atual + 1 + qtd_aulas_letivas]
-                if qtd_aulas_letivas > 0 and proximas.empty:
+                if len(proximas) < qtd_aulas_letivas:
+                    erros.append(
+                        f"Turma {turma}, disciplina {componente}: há {len(proximas)} aula(s) no escopo "
+                        f"após a posição atual, mas a semana exige {qtd_aulas_letivas}."
+                    )
                     continue
 
                 registro: Dict[str, Any] = {
@@ -334,7 +414,8 @@ def generate_records(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                     num_aula_por_dia.setdefault(data_curta, [])
 
                     if eh_dia_nao_letivo(dia_semana, data, dias_nao_letivos, datas_nao_letivas):
-                        num_aula_por_dia[data_curta].append("Dia não letivo")
+                        if "Dia não letivo" not in num_aula_por_dia[data_curta]:
+                            num_aula_por_dia[data_curta].append("Dia não letivo")
                         continue
 
                     if indice_proxima >= len(proximas):
@@ -388,6 +469,18 @@ def generate_records(config: Dict[str, Any]) -> List[Dict[str, Any]]:
                     disciplinas[componente]["ultima_aula"] = int(ultima["numero_aula"])
                     disciplinas[componente]["ultimo_inicio_planejamento"] = inicio
 
+        disciplinas_sem_escopo = disciplinas_grade - disciplinas_com_escopo
+        if disciplinas_sem_escopo:
+            erros.append(
+                f"Turma {turma}: disciplina(s) da grade não encontrada(s) nas abas de escopo selecionadas: "
+                f"{', '.join(sorted(disciplinas_sem_escopo))}."
+            )
+
+    if erros:
+        raise PlanningValidationError(
+            "Não foi possível gerar um planejamento completo:\n- " + "\n- ".join(dict.fromkeys(erros))
+        )
+
     return registros
 
 
@@ -400,38 +493,28 @@ def generate_planning_from_dict(
     output_file = Path(output_path)
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
-    if output_file.exists():
-        output_file.unlink()
-
     registros = generate_records(config)
-    df_final = pd.DataFrame(registros)
-
-    colunas_ordem = [
-        "InicioPlanejamento",
-        "FimPlanejamento",
-        "ComponenteCurricular",
-        "AnoSérie",
-        "Bimestre",
-        "NumAulaES1",
-        "NumAulaES2",
-        "Conteudo1",
-        "Conteudo2",
-        "Conteudo3",
-        "Conteudo4",
-        "Habilidades",
-        "ObjetivosAprendizagem1",
-        "ObjetivosAprendizagem2",
-        "ObjetivosAprendizagem3",
-        "ObjetivosAprendizagem4",
-        "QtdeAulas",
-        "DescriçãoAula",
-        "DataElaboração",
-    ]
-
-    df_final = df_final[[col for col in colunas_ordem if col in df_final.columns]]
+    df_final = pd.DataFrame(registros, columns=COLUNAS_MALA_DIRETA)
+    if list(df_final.columns) != COLUNAS_MALA_DIRETA:
+        raise PlanningValidationError(
+            "A estrutura da planilha não corresponde aos 19 campos esperados pela mala direta."
+        )
 
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         df_final.to_excel(writer, index=False)
+
+    try:
+        colunas_geradas = list(pd.read_excel(output_file, nrows=0).columns)
+    except Exception as exc:
+        output_file.unlink(missing_ok=True)
+        raise PlanningValidationError(f"A planilha gerada não pôde ser validada: {exc}") from exc
+
+    if colunas_geradas != COLUNAS_MALA_DIRETA:
+        output_file.unlink(missing_ok=True)
+        raise PlanningValidationError(
+            "A planilha gerada não contém exatamente os 19 campos esperados pela mala direta. "
+            "O arquivo foi descartado."
+        )
 
     if save_config and config_path:
         with open(config_path, "w", encoding="utf-8") as arquivo:
