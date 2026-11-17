@@ -15,6 +15,11 @@
       button:hover { background: #0054b3; }
       .note { background: #eef5ff; border-left: 4px solid #0069d9; padding: 14px; margin-bottom: 20px; }
       .flash { background: #fde4e4; border-left: 4px solid #d93025; padding: 14px; margin-bottom: 20px; }
+      .error-toast { align-items: flex-start; background: #fff0f0; border: 1px solid #d93025; border-left: 5px solid #d93025; border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,0.2); color: #681b16; display: flex; gap: 16px; justify-content: space-between; max-width: min(520px, calc(100vw - 32px)); padding: 16px; position: fixed; right: 16px; bottom: 16px; z-index: 10; }
+      .error-toast[hidden] { display: none; }
+      .error-toast-message { line-height: 1.45; overflow-wrap: anywhere; white-space: pre-line; }
+      .error-toast button { background: transparent; color: #681b16; flex: 0 0 auto; font-size: 22px; line-height: 1; margin: -8px -8px 0 0; padding: 4px 8px; }
+      .error-toast button:hover { background: #f9dada; }
       .github-fixo { align-items:center; background:#172033; border-radius:999px; box-shadow:0 2px 10px #17203330; color:#fff; display:flex; font-size:14px; gap:7px; padding:10px 14px; position:fixed; right:16px; text-decoration:none; top:16px; z-index:1; } .github-fixo svg { fill:currentColor; height:18px; width:18px; } .github-fixo:hover { background:#1859a9; } @media (max-width:520px) { .github-fixo { font-size:12px; padding:8px 10px; right:10px; top:10px; } .github-fixo svg { height:16px; width:16px; } main { margin:60px 16px; } }
     </style>
   </head>
@@ -62,6 +67,10 @@
       <p><a href="{{ url_for('login') }}"><button>Entrar com Google</button></a></p>
       {% endif %}
     </div>
+    <div id="errorToast" class="error-toast" role="alert" aria-live="assertive" aria-atomic="true" hidden>
+      <span id="errorToastMessage" class="error-toast-message"></span>
+      <button id="dismissErrorToast" type="button" aria-label="Fechar mensagem de erro">&times;</button>
+    </div>
     <style>
       .loader { border: 3px solid #f3f3f3; border-top: 3px solid #0069d9; border-radius: 50%; width: 18px; height: 18px; display:inline-block; vertical-align: middle; animation: spin 1s linear infinite; }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -72,6 +81,19 @@
         const btn = document.getElementById('generateButton');
         const status = document.getElementById('statusMessage');
         const loader = document.getElementById('loader');
+        const errorToast = document.getElementById('errorToast');
+        const errorToastMessage = document.getElementById('errorToastMessage');
+        const dismissErrorToast = document.getElementById('dismissErrorToast');
+
+        function showError(message){
+          if (!errorToast || !errorToastMessage) return;
+          errorToastMessage.textContent = message;
+          errorToast.hidden = false;
+        }
+
+        if (dismissErrorToast && errorToast) {
+          dismissErrorToast.addEventListener('click', () => { errorToast.hidden = true; });
+        }
 
         function setProcessing(on){
           if (!btn) return;
@@ -118,6 +140,7 @@
         if (form && btn) {
           form.addEventListener('submit', async function(e){
             e.preventDefault();
+            if (errorToast) errorToast.hidden = true;
             setProcessing(true);
 
             const formData = new FormData(form);
@@ -127,12 +150,10 @@
               const resp = await fetch(action, { method: 'POST', body: formData });
               await handleResponseAsDownload(resp);
             } catch (err) {
-              // show error to user
               const text = err && err.message ? err.message : 'Erro desconhecido ao gerar o arquivo.';
-              if (status) { status.textContent = text; status.style.display = 'inline'; }
+              showError(text);
             } finally {
-              // give user time to see message; reset UI shortly after
-              setTimeout(() => setProcessing(false), 800);
+              setProcessing(false);
             }
           });
         }

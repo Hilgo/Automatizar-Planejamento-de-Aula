@@ -229,9 +229,19 @@ saida/base_maladireta.xlsx
 
 ### 2. Executando no modo web
 
-```bash
+```powershell
+if (-not (Test-Path ".venv\Scripts\Activate.ps1")) { python -m venv .venv }
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+
+$env:SECRET_KEY = python -c "import secrets; print(secrets.token_hex(32))"
+$env:GOOGLE_CLIENT_ID = Read-Host "Google Client ID"
+$env:GOOGLE_CLIENT_SECRET = Read-Host "Google Client Secret"
+
 python app.py
 ```
+
+Execute esses comandos na pasta do projeto e mantenha a mesma janela do PowerShell aberta: as variáveis de ambiente ficam disponíveis apenas nela. O URI de redirecionamento cadastrado no cliente OAuth do Google precisa corresponder ao endereço usado no navegador.
 
 Abra no navegador:
 
@@ -254,7 +264,7 @@ Antes de usar, defina as variáveis de ambiente:
 No Console do Google Cloud, configure o URI de redirecionamento OAuth:
 
 ```text
-http://localhost:5000/authorize
+http://127.0.0.1:5000/authorize
 ```
 
 Na página web, faça login com o Google e então envie:
